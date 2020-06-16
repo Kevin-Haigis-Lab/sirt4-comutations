@@ -6,7 +6,8 @@ Joshua Cook
 ## Setup
 
 ``` r
-knitr::opts_chunk$set(echo = TRUE, comment = "#>", dpi = 300, cache = TRUE)
+knitr::opts_chunk$set(echo = TRUE, comment = "#>", dpi = 300, cache = TRUE, 
+                      message = FALSE, warning = FALSE)
 
 library(glue)
 library(jhcutils)
@@ -14,9 +15,11 @@ library(mustashe)
 library(magrittr)
 library(ggasym)
 library(MASS)
+library(tidybayes)
 library(rstanarm)
 library(bayestestR)
 library(see)
+library(ggtext)
 library(tidyverse)
 library(conflicted)
 
@@ -74,11 +77,7 @@ stash("goi_mutations",
         col_types = full_coding_muts_cols
     )
 })
-```
 
-    #> Loading stashed object.
-
-``` r
 goi_mutations
 ```
 
@@ -104,18 +103,18 @@ Number of samples with a mutation in each gene.
 ``` r
 goi_mutations %>%
     distinct(tumor_sample_barcode, hugo_symbol) %>%
-    count(hugo_symbol, sort = TRUE)
+    count(hugo_symbol, sort = TRUE) %>%
+    knitr::kable()
 ```
 
-    #> # A tibble: 6 x 2
-    #>   hugo_symbol     n
-    #>   <chr>       <int>
-    #> 1 KRAS         2051
-    #> 2 PIK3CA       1050
-    #> 3 BRAF          614
-    #> 4 PTEN          306
-    #> 5 PIK3CG        144
-    #> 6 SIRT4          22
+| hugo\_symbol |    n |
+| :----------- | ---: |
+| KRAS         | 2051 |
+| PIK3CA       | 1050 |
+| BRAF         |  614 |
+| PTEN         |  306 |
+| PIK3CG       |  144 |
+| SIRT4        |   22 |
 
 Plot the above values.
 
@@ -153,11 +152,7 @@ stash("MUTATION_SAMPLES",
     ) %>%
         u_pull(tumor_sample_barcode)
 })
-```
 
-    #> Loading stashed object.
-
-``` r
 stash("goi_mutations_anno", 
       depends_on = c("mutation_data_annotated_cols", "genes_of_interest"), 
 {
@@ -175,11 +170,7 @@ stash("goi_mutations_anno",
         col_types = mutation_data_annotated_cols
     )
 })
-```
 
-    #> Loading stashed object.
-
-``` r
 goi_mutations_anno
 ```
 
@@ -232,18 +223,18 @@ Count the number of samples with a mutation in the genes of interest.
 ``` r
 goi_mutations_anno %>%
     distinct(tumor_sample_barcode, hugo_symbol) %>%
-    count(hugo_symbol, sort = TRUE)
+    count(hugo_symbol, sort = TRUE) %>%
+    knitr::kable()
 ```
 
-    #> # A tibble: 6 x 2
-    #>   hugo_symbol     n
-    #>   <chr>       <int>
-    #> 1 KRAS          537
-    #> 2 PIK3CA        343
-    #> 3 BRAF          216
-    #> 4 PIK3CG         94
-    #> 5 PTEN           92
-    #> 6 SIRT4          22
+| hugo\_symbol |   n |
+| :----------- | --: |
+| KRAS         | 537 |
+| PIK3CA       | 343 |
+| BRAF         | 216 |
+| PIK3CG       |  94 |
+| PTEN         |  92 |
+| SIRT4        |  22 |
 
 All of the mutations to *SIRT4* are in whole exome sequencing (WES)
 data. Therefore, only this data will be used for the remainder of the
@@ -252,16 +243,16 @@ analysis.
 ``` r
 goi_mutations %>%
     filter(hugo_symbol == "SIRT4") %>%
-    count(dataset, target)
+    count(dataset, target) %>%
+    knitr::kable()
 ```
 
-    #> # A tibble: 4 x 3
-    #>   dataset                          target     n
-    #>   <chr>                            <chr>  <int>
-    #> 1 coadread_coca_cn                 exome      1
-    #> 2 coadread_dfci_2016               exome     11
-    #> 3 coadread_genentech               exome      2
-    #> 4 coadread_tcga_pan_can_atlas_2018 exome      8
+| dataset                               | target |  n |
+| :------------------------------------ | :----- | -: |
+| coadread\_coca\_cn                    | exome  |  1 |
+| coadread\_dfci\_2016                  | exome  | 11 |
+| coadread\_genentech                   | exome  |  2 |
+| coadread\_tcga\_pan\_can\_atlas\_2018 | exome  |  8 |
 
 ``` r
 goi_mutations_anno %>%
@@ -298,11 +289,7 @@ stash("goi_cna",
         col_types = cna_data_cols
     )
 })
-```
 
-    #> Loading stashed object.
-
-``` r
 goi_cna
 ```
 
@@ -325,23 +312,37 @@ The number of samples with each CNA value per gene.
 
 ``` r
 goi_cna %>%
-    count(hugo_symbol, cna, cna_value)
+    count(hugo_symbol, cna, cna_value) %>%
+    knitr::kable()
 ```
 
-    #> # A tibble: 25 x 4
-    #>    hugo_symbol cna           cna_value     n
-    #>    <chr>       <chr>             <dbl> <int>
-    #>  1 BRAF        amplification       2       2
-    #>  2 BRAF        normal             -1      17
-    #>  3 BRAF        normal              0    2232
-    #>  4 BRAF        normal              0.5     1
-    #>  5 BRAF        normal              1     529
-    #>  6 KRAS        amplification       2      20
-    #>  7 KRAS        deletion           -2       1
-    #>  8 KRAS        normal             -1     100
-    #>  9 KRAS        normal              0    2457
-    #> 10 KRAS        normal              1     203
-    #> # … with 15 more rows
+| hugo\_symbol | cna           | cna\_value |    n |
+| :----------- | :------------ | ---------: | ---: |
+| BRAF         | amplification |        2.0 |    2 |
+| BRAF         | normal        |      \-1.0 |   17 |
+| BRAF         | normal        |        0.0 | 2232 |
+| BRAF         | normal        |        0.5 |    1 |
+| BRAF         | normal        |        1.0 |  529 |
+| KRAS         | amplification |        2.0 |   20 |
+| KRAS         | deletion      |      \-2.0 |    1 |
+| KRAS         | normal        |      \-1.0 |  100 |
+| KRAS         | normal        |        0.0 | 2457 |
+| KRAS         | normal        |        1.0 |  203 |
+| PIK3CA       | amplification |        2.0 |    2 |
+| PIK3CA       | normal        |      \-1.0 |   51 |
+| PIK3CA       | normal        |        0.0 | 2589 |
+| PIK3CA       | normal        |        1.0 |  139 |
+| PIK3CG       | amplification |        2.0 |    2 |
+| PIK3CG       | normal        |      \-1.0 |    8 |
+| PIK3CG       | normal        |        0.0 | 2481 |
+| PIK3CG       | normal        |        1.0 |  290 |
+| PTEN         | deletion      |      \-2.0 |   49 |
+| PTEN         | normal        |      \-1.0 |  250 |
+| PTEN         | normal        |        0.0 | 2455 |
+| PTEN         | normal        |        1.0 |   27 |
+| SIRT4        | normal        |      \-1.0 |   72 |
+| SIRT4        | normal        |        0.0 |  411 |
+| SIRT4        | normal        |        1.0 |  108 |
 
 ``` r
 goi_cna %>%
@@ -377,11 +378,7 @@ stash("goi_rna",
         col_types = rna_data_cols
     )
 })
-```
 
-    #> Loading stashed object.
-
-``` r
 goi_rna
 ```
 
@@ -556,18 +553,18 @@ goi_mutations_data %>%
     summarise(total_muts = n(),
            important_muts = sum(is_important_mut),
            frac_important = important_muts / total_muts) %>%
-    ungroup()
+    ungroup() %>%
+    knitr::kable()
 ```
 
-    #> # A tibble: 6 x 4
-    #>   hugo_symbol total_muts important_muts frac_important
-    #>   <chr>            <int>          <int>          <dbl>
-    #> 1 BRAF               232            230          0.991
-    #> 2 KRAS               557            519          0.932
-    #> 3 PIK3CA             410            405          0.988
-    #> 4 PIK3CG             107             88          0.822
-    #> 5 PTEN               116            116          1    
-    #> 6 SIRT4               22             22          1
+| hugo\_symbol | total\_muts | important\_muts | frac\_important |
+| :----------- | ----------: | --------------: | --------------: |
+| BRAF         |         232 |             230 |       0.9913793 |
+| KRAS         |         557 |             519 |       0.9317774 |
+| PIK3CA       |         410 |             405 |       0.9878049 |
+| PIK3CG       |         107 |              88 |       0.8224299 |
+| PTEN         |         116 |             116 |       1.0000000 |
+| SIRT4        |          22 |              22 |       1.0000000 |
 
 ``` r
 goi_mutations_events <- goi_mutations_data %>%
@@ -633,13 +630,13 @@ Fraction of samples with a mutation in any of the genes of interest.
 
 ``` r
 goi_mutations_events %>%
-    summarise_if(is.numeric, mean)
+    summarise_if(is.numeric, mean) %>%
+    knitr::kable()
 ```
 
-    #> # A tibble: 1 x 7
-    #>    BRAF  KRAS PIK3CA   PTEN PIK3CG  SIRT4  PI3K
-    #>   <dbl> <dbl>  <dbl>  <dbl>  <dbl>  <dbl> <dbl>
-    #> 1 0.141 0.329  0.222 0.0686 0.0509 0.0144 0.293
+|      BRAF |      KRAS |    PIK3CA |      PTEN |    PIK3CG |     SIRT4 |      PI3K |
+| --------: | --------: | --------: | --------: | --------: | --------: | --------: |
+| 0.1410843 | 0.3291966 | 0.2220771 | 0.0685826 | 0.0509471 | 0.0143697 | 0.2926192 |
 
 ### Comutation
 
@@ -667,6 +664,23 @@ comutation_results <- combn(cols_to_compare, 2) %>%
 
 ``` r
 comutation_results %>%
+    filter(g1 == "SIRT4" | g2 == "SIRT4") %>%
+    select(g1, g2, `odds ratio` = estimate, `p-value` = p_value,
+           conf_low, conf_high) %>%
+    knitr::kable()
+```
+
+| g1     | g2    | odds ratio |   p-value | conf\_low | conf\_high |
+| :----- | :---- | ---------: | --------: | --------: | ---------: |
+| BRAF   | SIRT4 |  2.3179698 | 0.1117906 | 0.7343590 |   6.324636 |
+| KRAS   | SIRT4 |  0.5954907 | 0.3673287 | 0.1708064 |   1.694097 |
+| PIK3CA | SIRT4 |  3.5824561 | 0.0035974 | 1.3949164 |   9.202020 |
+| PTEN   | SIRT4 |  2.1763739 | 0.1877153 | 0.4058599 |   7.573810 |
+| PIK3CG | SIRT4 |  5.7715640 | 0.0040135 | 1.6195327 |  16.890563 |
+| SIRT4  | PI3K  |  4.3298482 | 0.0012490 | 1.6811036 |  12.002287 |
+
+``` r
+comutation_results %>%
     filter(g1 != "PI3K" & g2 != "PI3K") %>%
     mutate(
         p_value = map_dbl(p_value, ~ max(c(.x, 1e-10))),
@@ -685,16 +699,20 @@ comutation_results %>%
     ggplot(aes(x = g1, y = g2)) +
     geom_asymmat(aes(fill_tl = lp, fill_br = lo), fill_diag = "white") +
     geom_text(aes(label = p_label), size = 6, family = "Arial") +
-    scale_fill_tl_gradient(low = "grey90", high = green) +
-    scale_fill_br_gradient2(low = "purple", high = "orange") +
+    scale_fill_tl_gradient(low = "grey90", high = green, 
+                           guide = guide_colorbar(order = 1)) +
+    scale_fill_br_gradient2(low = "purple", high = "orange", 
+                            guide = guide_colorbar(order = 2)) +
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_discrete(expand = c(0, 0)) +
     theme(axis.title = element_blank()) +
     labs(fill_tl = "-log(p-value)",
          fill_br = "log OR\nof comut.",
-         title = "Comutation between individual genes",
-         subtitle = "The p-value and log OR between KRAS and BRAF were trimmed.")
+         title = "Comutation interactions between individual genes",
+         subtitle = "***: p-value < 0.001, **: p-value < 0.01, *: p-value < 0.05, .: p-value < 0.1")
 ```
 
-![](sirt4-comutation-analysis_files/figure-gfm/unnamed-chunk-24-1.png)<!-- -->
+![](sirt4-comutation-analysis_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
 
 The results in the three PI3K genes are lumped into one group.
 
@@ -718,16 +736,20 @@ comutation_results %>%
     ggplot(aes(x = g1, y = g2)) +
     geom_asymmat(aes(fill_tl = lp, fill_br = lo), fill_diag = "white") +
     geom_text(aes(label = p_label), size = 6, family = "Arial") +
-    scale_fill_tl_gradient(low = "grey90", high = green) +
-    scale_fill_br_gradient2(low = "purple", high = "orange") +
+    scale_fill_tl_gradient(low = "grey90", high = green, 
+                           guide = guide_colorbar(order = 1)) +
+    scale_fill_br_gradient2(low = "purple", high = "orange", 
+                            guide = guide_colorbar(order = 2)) +
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_discrete(expand = c(0, 0)) +
     theme(axis.title = element_blank()) +
     labs(fill_tl = "-log(p-value)",
          fill_br = "log OR\nof comut.",
-         title = "Comutation between individual genes",
-         subtitle = "The p-value and log OR between KRAS and BRAF were trimmed.")
+         title = "Comutation between individual genes and PI3K pathway",
+         subtitle = "***: p-value < 0.001, **: p-value < 0.01, *: p-value < 0.05, .: p-value < 0.1")
 ```
 
-![](sirt4-comutation-analysis_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
+![](sirt4-comutation-analysis_files/figure-gfm/unnamed-chunk-26-1.png)<!-- -->
 
 ### Binomial model
 
@@ -787,11 +809,7 @@ stash("m1", {
     m1$loo <- loo(m1, cores = 4)
     m1
 })
-```
 
-    #> Loading stashed object.
-
-``` r
 stash("m2", {
     m2 <- stan_glm(SIRT4 ~ 1 + KRAS, 
                    data = d, 
@@ -802,11 +820,7 @@ stash("m2", {
     m2$loo <- loo(m2, cores = 4)
     m2
 })
-```
 
-    #> Loading stashed object.
-
-``` r
 stash("m3", {
     m3 <- stan_glm(SIRT4 ~ 1 + BRAF, 
                    data = d, 
@@ -817,11 +831,7 @@ stash("m3", {
     m3$loo <- loo(m3, cores = 4)
     m3
 })
-```
 
-    #> Loading stashed object.
-
-``` r
 stash("m4", {
     m4 <- stan_glm(SIRT4 ~ 1 + KRAS + PIK3CA, 
                    data = d, 
@@ -832,11 +842,7 @@ stash("m4", {
     m4$loo <- loo(m4, cores = 4)
     m4
 })
-```
 
-    #> Loading stashed object.
-
-``` r
 stash("m5", {
     m5 <- stan_glm(SIRT4 ~ 1 + BRAF + PIK3CA, 
                    data = d, 
@@ -847,11 +853,7 @@ stash("m5", {
     m5$loo <- loo(m5, cores = 4)
     m5
 })
-```
 
-    #> Loading stashed object.
-
-``` r
 stash("m6", {
     m6 <- stan_glm(SIRT4 ~ 1 + KRAS + PIK3CG, 
                    data = d, 
@@ -862,11 +864,7 @@ stash("m6", {
     m6$loo <- loo(m6, cores = 4)
     m6
 })
-```
 
-    #> Loading stashed object.
-
-``` r
 stash("m7", {
     m7 <- stan_glm(SIRT4 ~ 1 + BRAF + PIK3CG,
                    data = d, 
@@ -877,11 +875,7 @@ stash("m7", {
     m7$loo <- loo(m7, cores = 4)
     m7
 })
-```
 
-    #> Loading stashed object.
-
-``` r
 stash("m8", {
     m8 <- stan_glm(SIRT4 ~ 1 + KRAS + PTEN, 
                    data = d, 
@@ -892,11 +886,7 @@ stash("m8", {
     m8$loo <- loo(m8, cores = 4)
     m8
 })
-```
 
-    #> Loading stashed object.
-
-``` r
 stash("m9", {
     m9 <- stan_glm(SIRT4 ~ 1 + BRAF + PTEN, 
                    data = d, 
@@ -907,11 +897,7 @@ stash("m9", {
     m9$loo <- loo(m9, cores = 4)
     m9
 })
-```
 
-    #> Loading stashed object.
-
-``` r
 stash("m10", {
     m10 <- stan_glm(SIRT4 ~ 1 + BRAF + KRAS + PIK3CA + PTEN + PIK3CG, 
                    data = d, 
@@ -922,11 +908,7 @@ stash("m10", {
     m10$loo <- loo(m10, cores = 4)
     m10
 })
-```
 
-    #> Loading stashed object.
-
-``` r
 stash("m11", {
     m11 <- stan_glm(SIRT4 ~ 1 + PIK3CA + PTEN + PIK3CG, 
                    data = d, 
@@ -937,11 +919,7 @@ stash("m11", {
     m11$loo <- loo(m11, cores = 4)
     m11
 })
-```
 
-    #> Loading stashed object.
-
-``` r
 stash("m12", {
     m12 <- stan_glm(SIRT4 ~ 1 + PIK3CA + PIK3CG, 
                    data = d, 
@@ -953,8 +931,6 @@ stash("m12", {
     m12
 })
 ```
-
-    #> Loading stashed object.
 
 ``` r
 model_list <- stanreg_list(m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12)
@@ -1003,9 +979,62 @@ logistic(coef(m12))
 ``` r
 plot(bayestestR::hdi(m12, ci = c(0.5, 0.75, 0.89, 0.95)),
      show_intercept = TRUE) +
-      scale_fill_flat() +
-      theme_minimal(base_size = 7, base_family = "Arial") +
-      labs(title = "HDI of m12")
+    scale_fill_flat() +
+    theme(
+        plot.title = element_markdown()
+    ) +
+    labs(title = "Posterior predictions for the binomial model of *SIRT4* comutation",
+         subtitle = "Highest density intervals (HDI) indicate the region of the posterior distribution with the indicated\nportion of density.",
+         y = "parameters",
+         x = "posterior distribution of parameter values")
 ```
 
-![](sirt4-comutation-analysis_files/figure-gfm/unnamed-chunk-31-1.png)<!-- -->
+![](sirt4-comutation-analysis_files/figure-gfm/unnamed-chunk-32-1.png)<!-- -->
+
+``` r
+pred_data <- tibble(PIK3CA = c(0, 1, 0, 1),
+                    PIK3CG = c(0, 0, 1, 1)) %>%
+    mutate(grp = case_when(
+            PIK3CA + PIK3CG == 2 ~ "PIK3CA & PIK3CG",
+            PIK3CA == 1 ~ "PIK3CA",
+            PIK3CG == 1 ~ "PIK3CG",
+            TRUE ~ "neither"),
+        grp = fct_inorder(grp))
+
+real_proportions <- goi_mutations_events %>%
+    count(PIK3CA, PIK3CG, SIRT4) %>%
+    group_by(PIK3CA, PIK3CG) %>%
+    mutate(frac = n / sum(n)) %>%
+    ungroup() %>%
+    filter(SIRT4 == 1) %>%
+    left_join(pred_data, by = c("PIK3CA", "PIK3CG"))
+
+pred_data %>%
+    add_fitted_draws(m12) %>%
+    mean_qi(.width = c(0.89, 0.95)) %>%
+    ggplot(aes(x = grp)) +
+    geom_linerange(aes(ymin = .lower, ymax = .upper, size = factor(.width)), 
+                   position = position_nudge(x = 0.1), 
+                   color = "grey50") +
+    geom_point(aes(y = .value), size = 4.3, 
+               position = position_nudge(x = 0.1)) +
+    geom_point(aes(y = frac),
+               data = real_proportions,
+               color = blue, size = 4.3, 
+               position = position_nudge(x = -0.1)) +
+    scale_y_continuous(limits = c(0, 0.2), expand = c(0, 0)) +
+    scale_x_discrete(labels = function(x) { str_remove(x, "_mutant") }) +
+    scale_size_manual(values = c(3, 2)) +
+    theme(
+        plot.title = element_markdown(),
+        plot.subtitle = element_markdown(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_markdown()
+    ) +
+    labs(title = "Posterior predictions for the binomial model of *SIRT4* comutation",
+         subtitle = "The blue points indiciate the actual proportion of samples with a *SIRT4* mutation.",
+         y = "predicted proportion with *SIRT4* mutation",
+         size = "credible\ninterval")
+```
+
+![](sirt4-comutation-analysis_files/figure-gfm/unnamed-chunk-33-1.png)<!-- -->

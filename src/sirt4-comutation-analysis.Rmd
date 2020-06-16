@@ -3,6 +3,7 @@ title: '*SIRT4* comutations in CRC'
 author: "Joshua Cook"
 date: "6/15/2020"
 output:
+    github_document:
     html_document:
         theme: paper
 ---
@@ -19,9 +20,11 @@ library(mustashe)
 library(magrittr)
 library(ggasym)
 library(MASS)
+library(tidybayes)
 library(rstanarm)
 library(bayestestR)
 library(see)
+library(ggtext)
 library(tidyverse)
 library(conflicted)
 
@@ -479,6 +482,15 @@ comutation_results <- combn(cols_to_compare, 2) %>%
 
 ```{r}
 comutation_results %>%
+    filter(g1 == "SIRT4" | g2 == "SIRT4") %>%
+    select(g1, g2, `odds ratio` = estimate, `p-value` = p_value,
+           conf_low, conf_high) %>%
+    knitr::kable()
+```
+
+
+```{r}
+comutation_results %>%
     filter(g1 != "PI3K" & g2 != "PI3K") %>%
     mutate(
         p_value = map_dbl(p_value, ~ max(c(.x, 1e-10))),
@@ -497,13 +509,17 @@ comutation_results %>%
     ggplot(aes(x = g1, y = g2)) +
     geom_asymmat(aes(fill_tl = lp, fill_br = lo), fill_diag = "white") +
     geom_text(aes(label = p_label), size = 6, family = "Arial") +
-    scale_fill_tl_gradient(low = "grey90", high = green) +
-    scale_fill_br_gradient2(low = "purple", high = "orange") +
+    scale_fill_tl_gradient(low = "grey90", high = green, 
+                           guide = guide_colorbar(order = 1)) +
+    scale_fill_br_gradient2(low = "purple", high = "orange", 
+                            guide = guide_colorbar(order = 2)) +
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_discrete(expand = c(0, 0)) +
     theme(axis.title = element_blank()) +
     labs(fill_tl = "-log(p-value)",
          fill_br = "log OR\nof comut.",
-         title = "Comutation between individual genes",
-         subtitle = "The p-value and log OR between KRAS and BRAF were trimmed.")
+         title = "Comutation interactions between individual genes",
+         subtitle = "***: p-value < 0.001, **: p-value < 0.01, *: p-value < 0.05, .: p-value < 0.1")
 ```
 
 The results in the three PI3K genes are lumped into one group.
@@ -528,13 +544,17 @@ comutation_results %>%
     ggplot(aes(x = g1, y = g2)) +
     geom_asymmat(aes(fill_tl = lp, fill_br = lo), fill_diag = "white") +
     geom_text(aes(label = p_label), size = 6, family = "Arial") +
-    scale_fill_tl_gradient(low = "grey90", high = green) +
-    scale_fill_br_gradient2(low = "purple", high = "orange") +
+    scale_fill_tl_gradient(low = "grey90", high = green, 
+                           guide = guide_colorbar(order = 1)) +
+    scale_fill_br_gradient2(low = "purple", high = "orange", 
+                            guide = guide_colorbar(order = 2)) +
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_discrete(expand = c(0, 0)) +
     theme(axis.title = element_blank()) +
     labs(fill_tl = "-log(p-value)",
          fill_br = "log OR\nof comut.",
-         title = "Comutation between individual genes",
-         subtitle = "The p-value and log OR between KRAS and BRAF were trimmed.")
+         title = "Comutation between individual genes and PI3K pathway",
+         subtitle = "***: p-value < 0.001, **: p-value < 0.01, *: p-value < 0.05, .: p-value < 0.1")
 ```
 
 ### Binomial model
@@ -712,19 +732,59 @@ logistic(coef(m12))
 ```{r}
 plot(bayestestR::hdi(m12, ci = c(0.5, 0.75, 0.89, 0.95)),
      show_intercept = TRUE) +
-      scale_fill_flat() +
-      theme_minimal(base_size = 7, base_family = "Arial") +
-      labs(title = "HDI of m12")
+    scale_fill_flat() +
+    theme(
+        plot.title = element_markdown()
+    ) +
+    labs(title = "Posterior predictions for the binomial model of *SIRT4* comutation",
+         subtitle = "Highest density intervals (HDI) indicate the region of the posterior distribution with the indicated\nportion of density.",
+         y = "parameters",
+         x = "posterior distribution of parameter values")
 ```
 
 ```{r}
 pred_data <- tibble(PIK3CA = c(0, 1, 0, 1),
-                    PIK3CG = c(0, 0, 1, 1))
+                    PIK3CG = c(0, 0, 1, 1)) %>%
+    mutate(grp = case_when(
+            PIK3CA + PIK3CG == 2 ~ "PIK3CA & PIK3CG",
+            PIK3CA == 1 ~ "PIK3CA",
+            PIK3CG == 1 ~ "PIK3CG",
+            TRUE ~ "neither"),
+        grp = fct_inorder(grp))
 
-library(tidybayes)
+real_proportions <- goi_mutations_events %>%
+    count(PIK3CA, PIK3CG, SIRT4) %>%
+    group_by(PIK3CA, PIK3CG) %>%
+    mutate(frac = n / sum(n)) %>%
+    ungroup() %>%
+    filter(SIRT4 == 1) %>%
+    left_join(pred_data, by = c("PIK3CA", "PIK3CG"))
+
 pred_data %>%
-    add_fitted_draws(m3_mapk_spec_stan) %>%
-    mean_qi(.width = c(0.89, 0.95))
-head(post)
+    add_fitted_draws(m12) %>%
+    mean_qi(.width = c(0.89, 0.95)) %>%
+    ggplot(aes(x = grp)) +
+    geom_linerange(aes(ymin = .lower, ymax = .upper, size = factor(.width)), 
+                   position = position_nudge(x = 0.1), 
+                   color = "grey50") +
+    geom_point(aes(y = .value), size = 4.3, 
+               position = position_nudge(x = 0.1)) +
+    geom_point(aes(y = frac),
+               data = real_proportions,
+               color = blue, size = 4.3, 
+               position = position_nudge(x = -0.1)) +
+    scale_y_continuous(limits = c(0, 0.2), expand = c(0, 0)) +
+    scale_x_discrete(labels = function(x) { str_remove(x, "_mutant") }) +
+    scale_size_manual(values = c(3, 2)) +
+    theme(
+        plot.title = element_markdown(),
+        plot.subtitle = element_markdown(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_markdown()
+    ) +
+    labs(title = "Posterior predictions for the binomial model of *SIRT4* comutation",
+         subtitle = "The blue points indiciate the actual proportion of samples with a *SIRT4* mutation.",
+         y = "predicted proportion with *SIRT4* mutation",
+         size = "credible\ninterval")
 ```
 

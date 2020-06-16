@@ -28,3 +28,17 @@ Follow the steps listed below to re-run the analysis on O2:
     from the *KRAS* comutation analysis.
 2.  Run `Rscript -e
     rmarkdown::render('src/sirt4-comutation-analysis.Rmd')`
+
+## Conclusions
+
+There were patterns of comutation between *SIRT4* and the key members of
+the PI3K signaling pathway, particularly with *PIK3CA* and *PIK3CG*.
+
+![comutation-stats](./src/sirt4-comutation-analysis_files/figure-html/unnamed-chunk-25-1.png)
+
+These genes were also identified as strong predictors of a *SIRT4*
+mutation in a binomial model.
+
+![model-posteriors-distributions](./src/sirt4-comutation-analysis_files/figure-html/unnamed-chunk-32-1.png)
+
+![model-posteriors-predictions](./src/sirt4-comutation-analysis_files/figure-html/unnamed-chunk-33-1.png)
